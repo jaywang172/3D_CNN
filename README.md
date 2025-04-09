@@ -74,7 +74,7 @@ model.eval()
 # 載入OpenCV人臉檢測器
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
-# 開啟攝像頭
+# 開啟CAMERA
 cap = cv2.VideoCapture(0)
 
 while True:
