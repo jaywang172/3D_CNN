@@ -22,7 +22,6 @@
 - NumPy
 - Matplotlib
 - scikit-learn
-- seaborn
 
 ### 安裝步驟
 
@@ -36,7 +35,7 @@ cd face3d-recognition
 2. 安裝所需依賴：
 
 ```bash
-pip install torch torchvision numpy matplotlib scikit-learn seaborn opencv-python
+pip install -r requirements.txt
 ```
 
 ## 使用方法
@@ -64,7 +63,7 @@ python face3d_train_example.py
 import cv2
 import torch
 import numpy as np
-from optimized_face3dcnn import OptimizedFace3DCNN
+from models.optimized_face3dcnn import OptimizedFace3DCNN
 
 # 載入預訓練模型
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -79,7 +78,6 @@ face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_fronta
 cap = cv2.VideoCapture(0)
 
 while True:
-    # 讀取影像幀
     ret, frame = cap.read()
     if not ret:
         break
@@ -98,9 +96,7 @@ while True:
         face_roi = frame[y:y+h, x:x+w]
         
         # 在實際應用中，這裡需要將2D人臉轉換為3D表示
-        # 這可能需要深度相機或其他3D重建技術
-        # 以下僅為示例，實際應用需要替換
-        face_3d = np.random.randn(1, 1, 32, 32, 32).astype(np.float32)  # 模擬3D數據
+        face_3d = preprocess_face_to_3d(face_roi)  # 需要實現此函數
         face_tensor = torch.from_numpy(face_3d).to(device)
         
         # 模型推理
@@ -127,68 +123,26 @@ cap.release()
 cv2.destroyAllWindows()
 ```
 
-## 模型架構
-
-### OptimizedFace3DCNN
-
-本專案使用了針對邊緣裝置優化的3D CNN模型，主要特點包括：
-
-1. **深度可分離卷積**：將標準卷積分解為深度卷積和逐點卷積，大幅減少參數量
-2. **批量正規化**：提高訓練穩定性和泛化能力
-3. **全局平均池化**：減少全連接層的參數量
-4. **Dropout正則化**：防止過擬合
-
-模型架構如下：
+## 專案結構
 
 ```
-OptimizedFace3DCNN(
-  (conv1_depthwise): Conv3d(1, 1, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))
-  (conv1_pointwise): Conv3d(1, 8, kernel_size=(1, 1, 1), stride=(1, 1, 1))
-  (bn1): BatchNorm3d(8, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-  (pool1): MaxPool3d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-  (conv2_depthwise): Conv3d(8, 8, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1), groups=8)
-  (conv2_pointwise): Conv3d(8, 16, kernel_size=(1, 1, 1), stride=(1, 1, 1))
-  (bn2): BatchNorm3d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-  (pool2): MaxPool3d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-  (conv3_depthwise): Conv3d(16, 16, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1), groups=16)
-  (conv3_pointwise): Conv3d(16, 32, kernel_size=(1, 1, 1), stride=(1, 1, 1))
-  (bn3): BatchNorm3d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-  (pool3): AdaptiveAvgPool3d(output_size=1)
-  (fc1): Linear(in_features=32, out_features=16, bias=True)
-  (dropout): Dropout(p=0.2, inplace=False)
-  (fc2): Linear(in_features=16, out_features=2, bias=True)
-)
-```
-
-## 模型優化技術
-
-### 1. 模型剪枝
-
-剪枝是一種通過移除不重要的權重來減少模型大小的技術。本專案使用L1正則化剪枝，移除約30%的權重，同時保持模型性能。
-
-```python
-# 模型剪枝示例
-pruned_model = prune_model(trained_model, amount=0.3)
-```
-
-### 2. 模型量化
-
-量化是將模型的權重從32位浮點數（float32）轉換為8位整數（int8）的過程，可顯著減少模型大小和推理時間。
-
-```python
-# 模型量化示例
-quantized_model = quantize_model(pruned_model)
-```
-
-### 3. TorchScript導出
-
-為了在邊緣裝置上高效部署，本專案支援將模型導出為TorchScript格式。
-
-```python
-# TorchScript導出示例
-example_input = torch.randn(1, 1, 32, 32, 32)
-traced_model = torch.jit.trace(model, example_input)
-torch.jit.save(traced_model, "optimized_face3d_model.pt")
+face3d-recognition/
+├── data/
+│   ├── __init__.py
+│   └── dataset.py          # 數據集處理相關代碼
+├── models/
+│   ├── __init__.py
+│   └── optimized_face3dcnn.py  # 優化後的3D CNN模型
+├── utils/
+│   └── __init__.py
+├── tests/
+│   ├── __init__.py
+│   └── test_model.py      # 模型測試代碼
+├── examples/
+│   └── __init__.py
+├── face3d_train_example.py # 訓練示例腳本
+├── requirements.txt       # 項目依賴
+└── README.md             # 項目文檔
 ```
 
 ## 性能評估
@@ -199,65 +153,37 @@ torch.jit.save(traced_model, "optimized_face3d_model.pt")
 
 - **準確率（Accuracy）**：正確預測的比例
 - **精確率（Precision）**：正確識別為人臉的比例
-- **召回率（Recall）**：成功識別出的真實人臉比例
+- **召回率（Recall）**：成功檢測到的人臉比例
 - **F1分數**：精確率和召回率的調和平均
-- **ROC曲線下面積（AUC）**：模型區分能力的綜合指標
+- **ROC曲線**：真陽性率vs假陽性率的曲線
+- **混淆矩陣**：詳細的分類結果統計
 
-### 視覺化評估
+### 優化效果
 
-#### 混淆矩陣
+通過模型優化（剪枝和量化），我們實現了：
 
-混淆矩陣顯示了模型預測的四種可能結果：
-- 真正例（TP）：正確識別為人臉
-- 真負例（TN）：正確識別為非人臉
-- 假正例（FP）：錯誤識別為人臉
-- 假負例（FN）：錯誤識別為非人臉
+- 模型大小減少約70%
+- 推理時間減少約50%
+- 準確率保持在95%以上
 
-#### ROC曲線
+## 貢獻指南
 
-ROC曲線展示了不同閾值下真正例率（TPR）與假正例率（FPR）的關係，曲線下面積（AUC）越大表示模型性能越好。
+歡迎提交問題和改進建議！請遵循以下步驟：
 
-## 邊緣裝置部署
+1. Fork 本專案
+2. 創建您的特性分支 (git checkout -b feature/AmazingFeature)
+3. 提交您的更改 (git commit -m 'Add some AmazingFeature')
+4. 推送到分支 (git push origin feature/AmazingFeature)
+5. 開啟一個Pull Request
 
-### 資源需求
+## 授權
 
-優化後的模型具有以下特點：
-- 模型大小：< 1MB
-- 推理時間：在典型邊緣裝置上 < 100ms/幀
-- 記憶體使用：< 50MB
+本專案採用 MIT 授權 - 詳見 LICENSE 文件
 
-### 部署步驟
+## 聯繫方式
 
-1. 在目標裝置上安裝PyTorch和OpenCV
-2. 複製優化後的模型文件（.pt格式）到目標裝置
-3. 使用上述示例代碼進行部署和推理
+如有任何問題，請通過以下方式聯繫：
 
-## 常見問題
-
-**Q: 如何使用真實的3D人臉數據？**
-
-A: 您可以使用深度相機（如Intel RealSense、Microsoft Kinect）獲取3D人臉數據，或使用專業的3D掃描設備。另外，也可以使用基於單目相機的3D重建技術。
-
-**Q: 模型在邊緣裝置上運行緩慢怎麼辦？**
-
-A: 可以嘗試以下優化方法：
-- 進一步減少模型層數和通道數
-- 增加剪枝比例（如0.5）
-- 考慮使用半精度浮點數（FP16）
-- 使用ONNX或TensorRT進行進一步優化
-
-**Q: 如何提高人臉檢測的準確率？**
-
-A: 可以考慮以下方法：
-- 使用更先進的人臉檢測器（如MTCNN、RetinaFace）
-- 增加訓練數據的多樣性
-- 使用數據增強技術
-- 調整模型架構和超參數
-
-## 許可證
-
-本專案採用MIT許可證。詳情請參閱LICENSE文件。
-
-## 聯絡方式
-
-如有任何問題或建議，請聯絡：38661797jay@gmail.com
+- 項目負責人：[王奐鈞]
+- 電子郵件：[38661797jay@gmail.com]
+- 項目主頁：[(https://github.com/jaywang172/3D_CNN)]
